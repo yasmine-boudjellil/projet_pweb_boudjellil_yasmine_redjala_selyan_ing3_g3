@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SELYAS — Sport Shoes Catalog</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+</head>
+<body>
+
+<div class="cursor-dot"  id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<canvas id="particles-canvas"></canvas>
+
+<div id="app">
+
+  <!-- ══ HEADER ══ -->
+  <header>
+    <div class="logo">
+      <span class="logo-main">SELYAS</span>
+      <span class="logo-sub">Sport Catalog</span>
+    </div>
+    <nav>
+      <button class="nav-btn" :class="{ active: view === 'list' }" @click="switchToList">View all</button>
+      <button class="nav-btn" :class="{ active: view === 'add' }"  @click="view = 'add'">Add product</button>
+    </nav>
+    <div class="header-stats">
+      <div class="stat-pill" :class="{ 'pulse-anim': justAdded }" @animationend="justAdded = false">
+        <div class="stat-dot"></div>
+        <span>{{ totalCount }} ITEMS</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ MARQUEE ══ -->
+  <div class="marquee-wrap">
+    <div class="marquee-track">
+      <template v-for="i in 8" :key="i">
+        <span class="marquee-item">NEW DROP <span class="marquee-dot"></span></span>
+        <span class="marquee-item">SPORT SHOES <span class="marquee-dot"></span></span>
+        <span class="marquee-item">SELYAS CATALOG 2025 <span class="marquee-dot"></span></span>
+        <span class="marquee-item">PREMIUM COLLECTION <span class="marquee-dot"></span></span>
+      </template>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- ══ LIST VIEW ══ -->
+    <div v-if="view === 'list'" class="view-enter">
+
+      <div class="hero-strip">
+        <div class="hero-title">Sport<span class="accent">Shoes.</span></div>
+        <div class="hero-right">
+          <div class="hero-count">{{ filteredProducts.length }}</div>
+          <div class="hero-count-label">Products<br>in catalog</div>
+          <div class="hero-line"></div>
+        </div>
+        <div class="hero-bg-text">CATALOG</div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-section">
+        <div class="search-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <input class="search-input" v-model="search" type="text" placeholder="Search brand, model, style..." @input="onSearchInput"/>
+        <div class="search-results-badge" v-if="search">{{ filteredProducts.length }} result{{ filteredProducts.length !== 1 ? 's' : '' }}</div>
+        <button class="search-clear" v-if="search" @click="clearSearch">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="content-layout">
+
+        <!-- Filter sidebar -->
+        <aside class="filter-sidebar">
+          <div class="filter-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+            Filters
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Category</div>
+            <div class="filter-options">
+              <button class="filter-chip" :class="{ active: filters.category === '' }"       @click="setCategory('')">All</button>
+              <button class="filter-chip" :class="{ active: filters.category === 'men' }"    @click="setCategory('men')">Men</button>
+              <button class="filter-chip" :class="{ active: filters.category === 'women' }"  @click="setCategory('women')">Women</button>
+              <button class="filter-chip" :class="{ active: filters.category === 'kids' }"   @click="setCategory('kids')">Kids</button>
+              <button class="filter-chip" :class="{ active: filters.category === 'unisex' }" @click="setCategory('unisex')">Unisex</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Max price</div>
+            <input type="range" class="price-slider" v-model="filters.maxPrice" min="0" max="100000" step="500" @input="applyFilters"/>
+            <div class="price-range-val">
+              <span>0</span>
+              <span class="price-val-current">{{ Number(filters.maxPrice).toLocaleString() }} DZD</span>
+            </div>
+          </div>
+          <div class="active-filters" v-if="filters.category || filters.maxPrice < 100000">
+            <div class="filter-group-label">Active filters</div>
+            <div class="active-filter-tag" v-if="filters.category">
+              {{ filters.category }} <button @click="setCategory('')">×</button>
+            </div>
+            <div class="active-filter-tag" v-if="filters.maxPrice < 100000">
+              ≤ {{ Number(filters.maxPrice).toLocaleString() }} DZD
+              <button @click="filters.maxPrice = 100000; applyFilters()">×</button>
+            </div>
+            <button class="reset-filters-btn" @click="resetFilters">Reset all</button>
+          </div>
+        </aside>
+
+        <!-- Grid -->
+        <div class="grid-area">
+          <div class="grid-header">
+            <span class="grid-label">Latest collection</span>
+            <span class="grid-label">{{ filteredProducts.length }} product{{ filteredProducts.length !== 1 ? 's' : '' }}</span>
+          </div>
+          <div class="products-grid">
+            <div class="empty-state" v-if="filteredProducts.length === 0">
+              <div class="empty-num">404</div>
+              <div class="empty-title">No shoes found</div>
+              <div class="empty-sub">Try a different search or adjust your filters</div>
+            </div>
+            <div
+              class="card"
+              v-for="(product, index) in filteredProducts"
+              :key="product.id"
+              :style="{ animationDelay: (index * 0.06) + 's' }"
+              @click="openModal(product)"
+              @mousemove="tiltCard($event)"
+              @mouseleave="resetTilt($event)"
+            >
+              <div class="card-img-wrap">
+                <img :src="product.image_url" :alt="product.name" @error="e => e.target.style.opacity='0.2'"/>
+                <div class="card-shimmer"></div>
+                <span class="card-tag">{{ product.category || 'New' }}</span>
+                <div class="card-overlay"><span class="card-overlay-text">View details</span></div>
+              </div>
+              <div class="card-body">
+                <div class="card-name">{{ product.name }}</div>
+                <div class="card-desc">{{ product.description }}</div>
+                <div class="card-footer">
+                  <div>
+                    <div class="card-price">{{ Number(product.price).toLocaleString() }}</div>
+                    <div class="card-currency">DZD</div>
+                  </div>
+                  <button class="card-btn" @click.stop="openModal(product)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ADD PRODUCT VIEW ══ -->
+    <div v-if="view === 'add'" class="add-wrap view-enter">
+      <div class="add-left">
+        <div class="add-eyebrow">New product</div>
+        <div class="add-title">Drop a<br><span>new pair.</span></div>
+
+        <div class="field">
+          <div class="field-label"><span>Shoe name</span><span class="field-num">01</span></div>
+          <input class="field-input" v-model="form.name" type="text" placeholder="e.g. Nike Air Max 90" maxlength="100"/>
+          <div class="field-error" v-if="errors.name">{{ errors.name }}</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Description</span><span class="field-num">02</span></div>
+          <textarea class="field-textarea" v-model="form.description" placeholder="What makes this shoe special?"></textarea>
+          <div class="field-error" v-if="errors.description">{{ errors.description }}</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Price (DZD)</span><span class="field-num">03</span></div>
+          <input class="field-input" v-model="form.price" type="number" min="0" step="0.01" placeholder="e.g. 12000"/>
+          <div class="field-error" v-if="errors.price">{{ errors.price }}</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Main image URL</span><span class="field-num">04</span></div>
+          <input class="field-input" v-model="form.image_url" type="text" placeholder="https://example.com/shoe.jpg"/>
+          <div class="field-error" v-if="errors.image_url">{{ errors.image_url }}</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span>Category</span><span class="field-num">05</span></div>
+          <div class="category-btns">
+            <button class="cat-btn" v-for="cat in ['men','women','kids','unisex']" :key="cat" :class="{ active: form.category === cat }" @click="form.category = cat">{{ cat }}</button>
+          </div>
+        </div>
+
+        <!-- Color variants: URL only, no name, no dots -->
+        <div class="colors-section">
+          <div class="colors-header">
+            <span>Other colors <span style="color:var(--accent);font-size:10px;">(optional)</span></span>
+            <button class="add-color-btn" @click="addColorVariant">+ Add image</button>
+          </div>
+          <div class="color-variant-row" v-for="(cv, i) in form.colors" :key="i">
+            <input class="color-url-input-full" v-model="cv.image_url" type="text" :placeholder="'Color ' + (i+1) + ' — paste image URL here'"/>
+            <button class="remove-color-btn" @click="removeColorVariant(i)">×</button>
+          </div>
+        </div>
+
+        <div class="submit-area">
+          <button class="btn-submit" @click="submitForm">
+            <span>Add to catalog</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+          </button>
+          <div class="success-banner" v-if="successMsg">
+            <div class="success-dot"></div>{{ successMsg }}
+          </div>
+        </div>
+      </div>
+
+      <div class="add-right">
+        <div class="add-right-bg"><span class="add-right-bg-text">PREVIEW</span></div>
+        <div class="preview-card">
+          <div class="preview-img-wrap">
+            <img v-if="form.image_url" :src="form.image_url" alt="Preview"/>
+            <div v-else class="preview-placeholder">Image preview</div>
+          </div>
+          <div class="preview-body">
+            <div class="preview-name">{{ form.name || 'Shoe name' }}</div>
+            <div class="preview-desc">{{ form.description || 'Description will appear here...' }}</div>
+            <div class="preview-price">{{ form.price ? Number(form.price).toLocaleString() + ' DZD' : '— DZD' }}</div>
+          </div>
+        </div>
+        <div class="preview-label">Live preview</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══ FOOTER ══ -->
+  <footer class="site-footer" v-if="view === 'list'">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="footer-logo">SELYAS</div>
+        <div class="footer-tagline">Premium Sport Shoes Catalog</div>
+        <div class="footer-desc">A curated catalog of the finest sport shoes. Built with passion for design and performance.</div>
+      </div>
+
+      <div class="footer-col">
+        <div class="footer-col-title">Catalog</div>
+        <a class="footer-link" @click.prevent="switchToList">View all products</a>
+        <a class="footer-link" @click.prevent="view = 'add'">Add a product</a>
+      </div>
+
+      <div class="footer-col">
+        <div class="footer-col-title">Contact</div>
+        <div class="footer-contact-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:13px;height:13px;flex-shrink:0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>contact@selyas-catalog.com</span>
+        </div>
+        <div class="footer-contact-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:13px;height:13px;flex-shrink:0"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.58 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.29 6.29l1.02-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span>+213 (0) 123 456 789</span>
+        </div>
+        <div class="footer-contact-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:13px;height:13px;flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span>Boumerdes, Algeria</span>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <div class="footer-col-title">Follow us</div>
+        <div class="footer-socials">
+          <a class="footer-social-btn" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            Instagram
+          </a>
+          <a class="footer-social-btn" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53A4.48 4.48 0 0 0 22.43.36a9 9 0 0 1-2.88 1.1A4.52 4.52 0 0 0 16.11 0c-2.5 0-4.52 2.02-4.52 4.52 0 .35.04.7.11 1.03C7.69 5.37 4.07 3.58 1.64.9a4.52 4.52 0 0 0-.61 2.27c0 1.57.8 2.95 2.01 3.76a4.5 4.5 0 0 1-2.05-.57v.06c0 2.19 1.56 4.01 3.63 4.43a4.54 4.54 0 0 1-2.04.08 4.53 4.53 0 0 0 4.22 3.14A9.07 9.07 0 0 1 0 19.54a12.8 12.8 0 0 0 6.92 2.03c8.3 0 12.85-6.88 12.85-12.85 0-.2 0-.39-.01-.58A9.17 9.17 0 0 0 22 4.3a9 9 0 0 1-2.59.71A4.52 4.52 0 0 0 21.36.91z"/></svg>
+            Twitter
+          </a>
+          <a class="footer-social-btn" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            LinkedIn
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-bottom-left">
+        <span>© 2026 SELYAS Sport Catalog. All rights reserved.</span>
+      </div>
+      <div class="footer-bottom-right">
+        <span class="footer-tech">Built with</span>
+        <span class="footer-tech-tag">Vue.js</span>
+        <span class="footer-tech-tag">Flask</span>
+        <span class="footer-tech-tag">MySQL</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ══ PRODUCT MODAL ══ -->
+  <div class="modal-backdrop" v-if="modal.open" @click.self="closeModal">
+    <div class="modal" v-if="modal.product">
+
+      <button class="modal-close" @click="closeModal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+
+      <!-- LEFT: full-image slideshow -->
+      <div class="modal-img-col">
+        <div class="modal-slideshow">
+
+          <button class="slide-arrow slide-arrow-left" @click="slidePrev" :class="{ hidden: allImages.length <= 1 }">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+
+          <div class="slide-img-wrap" @click="modal.zoomed = true">
+            <img :src="modalImage" :alt="modal.product.name" class="slide-img" :key="modal.slideIndex"/>
+            <div class="modal-accent-bar"></div>
+            <div class="modal-zoom-hint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:12px;height:12px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
+              Click to zoom
+            </div>
+            <div class="slide-counter" v-if="allImages.length > 1">
+              {{ modal.slideIndex + 1 }} / {{ allImages.length }}
+            </div>
+          </div>
+
+          <button class="slide-arrow slide-arrow-right" @click="slideNext" :class="{ hidden: allImages.length <= 1 }">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Dot indicators -->
+        <div class="slide-dots" v-if="allImages.length > 1">
+          <div
+            class="slide-dot"
+            v-for="(img, i) in allImages"
+            :key="i"
+            :class="{ active: modal.slideIndex === i }"
+            @click="modal.slideIndex = i"
+          ></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: info -->
+      <div class="modal-info">
+        <div class="modal-eyebrow">
+          <span class="modal-category-badge" v-if="modal.product.category">{{ modal.product.category }}</span>
+          Sport shoes
+        </div>
+        <div class="modal-name">{{ modal.product.name }}</div>
+        <div class="modal-desc">{{ modal.product.description }}</div>
+
+        <div class="modal-price-wrap">
+          <div class="modal-price">{{ Number(modal.product.price).toLocaleString() }}</div>
+          <div class="modal-price-label">ALGERIAN DINAR (DZD)</div>
+        </div>
+
+        <div class="modal-colorways" v-if="allImages.length > 1">
+          <span class="modal-total-num">{{ allImages.length }}</span>
+          <span class="modal-total-label">colorways — use ← → to browse</span>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-delete-product" @click="deleteProduct" :disabled="modal.deletingProduct">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            {{ modal.deletingProduct ? 'Deleting...' : 'Delete shoe' }}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ ZOOM LIGHTBOX ══ -->
+  <div class="lightbox" v-if="modal.zoomed" @click="modal.zoomed = false">
+    <img :src="modalImage" alt="Zoomed view"/>
+    <div class="lightbox-hint">Click anywhere to close</div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+const dot=document.getElementById('cursorDot'),ring=document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+(function animC(){rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;dot.style.left=mx+'px';dot.style.top=my+'px';ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(animC);})();
+document.addEventListener('mouseover',e=>{
+  const h=e.target.closest('button,a,.card,.filter-chip,.cat-btn,.modal-main-img-wrap,.slide-img-wrap,.slide-arrow');
+  dot.classList.toggle('hovering',!!h);ring.classList.toggle('hovering',!!h);
+});
+const canvas=document.getElementById('particles-canvas'),ctx=canvas.getContext('2d');
+let W,H,particles=[];
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+function Particle(){this.x=Math.random()*W;this.y=Math.random()*H;this.size=Math.random()*1.8+0.4;this.speedX=(Math.random()-0.5)*0.3;this.speedY=-(Math.random()*0.4+0.1);this.opacity=Math.random()*0.6+0.1;this.type=Math.random()>0.7?'star':'dot';}
+Particle.prototype.update=function(){this.x+=this.speedX;this.y+=this.speedY;if(this.y<-10){this.y=H+10;this.x=Math.random()*W;}};
+Particle.prototype.draw=function(){ctx.save();ctx.globalAlpha=this.opacity;if(this.type==='star'){ctx.fillStyle='#c8ff00';ctx.translate(this.x,this.y);ctx.beginPath();for(let i=0;i<5;i++){const a=(i*4*Math.PI)/5-Math.PI/2;const r=i%2===0?this.size*2:this.size;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);}ctx.closePath();ctx.fill();}else{ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();}ctx.restore();};
+for(let i=0;i<90;i++)particles.push(new Particle());
+(function animP(){ctx.clearRect(0,0,W,H);particles.forEach(p=>{p.update();p.draw();});requestAnimationFrame(animP);})();
+</script>
+</body>
+</html>
